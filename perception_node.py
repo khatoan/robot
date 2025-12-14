@@ -297,6 +297,8 @@ class PerceptionNode(Node):
         - convert -> run YOLO -> publish detections -> publish image_web (jpeg)
         """
         try:
+            if msg.header.frame_id != "imx708":
+                return  # Chỉ xử lý camera IMX708 hiện tại
             # Chuyển Image ROS sang OpenCV (BGR)
             frame = self.bridge.imgmsg_to_cv2(msg, "bgr8")
 
