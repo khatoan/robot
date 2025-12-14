@@ -31,6 +31,7 @@ setup(
             "fusion_node = robot.fusion_node:main",
             "decision_node = robot.decision_node:main",
             "communication_node = robot.communication_node:main",
+            "camera_bridge_node = robot.camera_bridge_node:main",
         ],
     },
 )
