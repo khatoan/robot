@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# camera_bridge_node.py
 
+# Import các thư viện cần thiết
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
@@ -10,13 +12,15 @@ import cv2
 
 
 class CameraBridgeNode(Node):
+
+    # Khởi tạo node
     def __init__(self):
         super().__init__("camera_bridge_node")
 
         self.width = 640
         self.height = 480
-        self.channels = 3  # RGB
-        self.frame_size = self.width * self.height * self.channels
+        self.channels = 3
+        self.frame_size = self.width * self.height * 3 // 2  # YUV420p
 
         self.publisher = self.create_publisher(Image, "/camera/image_raw", 10)
 
@@ -26,7 +30,7 @@ class CameraBridgeNode(Node):
             [
                 "rpicam-vid",
                 "--codec",
-                "rgb",
+                "yuv420",
                 "--width",
                 str(self.width),
                 "--height",
@@ -42,15 +46,19 @@ class CameraBridgeNode(Node):
 
         self.timer = self.create_timer(0.03, self.read_frame)  # ~30 FPS
 
+    # Đọc khung hình từ rpicam-vid và xuất bản dưới dạng ROS2 Image message
     def read_frame(self):
         raw = self.proc.stdout.read(self.frame_size)
         if len(raw) != self.frame_size:
             self.get_logger().warn("Incomplete frame received")
             return
 
-        frame = np.frombuffer(raw, dtype=np.uint8)
-        frame = frame.reshape((self.height, self.width, 3))
+        # Chuyển đổi YUV420p sang RGB
+        yuv = np.frombuffer(raw, dtype=np.uint8)
+        yuv = yuv.reshape((self.height * 3 // 2, self.width))
+        frame = cv2.cvtColor(yuv, cv2.COLOR_YUV2RGB_I420)
 
+        # Tạo và xuất bản Image message
         msg = Image()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.header.frame_id = "camera"
@@ -63,6 +71,7 @@ class CameraBridgeNode(Node):
         self.publisher.publish(msg)
 
 
+# Hàm main để khởi chạy node
 def main(args=None):
     rclpy.init(args=args)
     node = CameraBridgeNode()
