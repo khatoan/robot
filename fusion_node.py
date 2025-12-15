@@ -19,6 +19,7 @@ from std_msgs.msg import Float32
 from geometry_msgs.msg import Pose2D
 import csv, os, math
 from datetime import datetime, timezone
+from rclpy.qos import qos_profile_sensor_data
 
 
 class FusionNode(Node):
@@ -37,7 +38,9 @@ class FusionNode(Node):
         self.latest_pose = None
 
         # Đăng ký các subscriber
-        self.create_subscription(LaserScan, "/lidar/scan", self.lidar_cb, 20)
+        self.create_subscription(
+            LaserScan, "/scan", self.lidar_cb, qos_profile_sensor_data
+        )
         self.create_subscription(Float32, "/lidar/tilt_angle", self.tilt_cb, 20)
         self.create_subscription(Pose2D, "/pose", self.pose_cb, 20)
 
@@ -115,3 +118,11 @@ class FusionNode(Node):
         )
         # reset latest_lidar to avoid duplicate write for same scan unless lidar publishes new
         self.latest_lidar = None
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = FusionNode()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
