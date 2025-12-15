@@ -49,6 +49,7 @@ except Exception:
 
 # Tiện ích ROS2 để lấy đường dẫn package
 from ament_index_python.packages import get_package_share_directory
+from rclpy.qos import qos_profile_sensor_data
 
 
 class ServoController:
@@ -189,6 +190,7 @@ class PerceptionNode(Node):
         self.declare_parameter("model_cfg", "yolov4-tiny.cfg")
         self.declare_parameter("model_weights", "yolov4-tiny.weights")
         self.declare_parameter("names_file", "coco.names")
+        self.declare_parameter("servo_sweep_rate_hz", 10.0)
 
         # Lấy giá trị tham số
         self.cam1_topic = self.get_parameter("camera_imx708_topic").value
@@ -208,6 +210,9 @@ class PerceptionNode(Node):
         self.pose_pub = self.create_publisher(Pose2D, "/pose", qos)
         self.tilt_pub = self.create_publisher(Float32, "/lidar/tilt_angle", qos)
         self.image_web_pub = self.create_publisher(Image, "/camera/image_web", qos)
+        self.lidar_pub = self.create_publisher(
+            LaserScan, "/lidar/scan", qos_profile_sensor_data
+        )
 
         # Khởi tạo ServoController
         servo_mode = self.get_parameter("servo_mode").value
@@ -246,7 +251,13 @@ class PerceptionNode(Node):
         # Subscribe các topic camera, IMU và lidar
         self.create_subscription(Image, self.cam1_topic, self.camera_callback, 10)
         self.create_subscription(Image, self.cam2_topic, self.camera_callback, 10)
-        self.create_subscription(LaserScan, self.lidar_topic, self.lidar_callback, 10)
+        self.create_subscription(
+            LaserScan,
+            "/scan",  # subscribe trực tiếp
+            self.lidar_callback,
+            qos_profile_sensor_data,
+        )
+
         # Subscribe topic imu nếu có
         try:
             self.create_subscription(Imu, self.imu_topic, self.imu_callback, 20)
@@ -380,7 +391,7 @@ class PerceptionNode(Node):
 
     # Callback LIDAR (hiện chưa xử lý, dành cho mở rộng sau)
     def lidar_callback(self, msg: LaserScan):
-        pass
+        self.lidar_pub.publish(msg)
 
     # Cập nhật yaw từ topic IMU và publish Pose2D (nếu có bên publish topic imu)
     def imu_callback(self, msg: Imu):
