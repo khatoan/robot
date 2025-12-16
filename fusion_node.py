@@ -29,8 +29,24 @@ class FusionNode(Node):
 
         # Khởi tạo ROS2 node và đọc tham số cấu hình đường dẫn file CSV đầu ra
         super().__init__("fusion_node")
-        self.declare_parameter("output_csv", "lidar_imu_odom_log.csv")
-        self.csv_path = self.get_parameter("output_csv").value
+        # self.declare_parameter("output_csv", "lidar_imu_odom_log.csv")
+        # self.csv_path = self.get_parameter("output_csv").value
+        self.declare_parameter("output_dir", "/tmp")
+        self.output_dir = self.get_parameter("output_dir").value
+        if not os.path.isdir(self.output_dir):
+            self.get_logger().warn(
+                f"Output dir '{self.output_dir}' not found, fallback to /tmp"
+            )
+            self.output_dir = "/tmp"
+        os.makedirs(self.output_dir, exist_ok=True)
+
+        # tạo tên file theo timestamp để tránh ghi đè
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        self.csv_path = os.path.join(self.output_dir, f"fusion_log_{ts}.csv")
+
+        self.header_written = False
+
+        self.get_logger().info(f"FusionNode started, CSV output: {self.csv_path}")
 
         # Lưu dữ liệu mới nhất từ các nguồn bất đồng bộ, dùng để ghép thành một frame fusion hoàn chỉnh
         self.latest_lidar = None
@@ -45,9 +61,9 @@ class FusionNode(Node):
         self.create_subscription(Pose2D, "/pose", self.pose_cb, 20)
 
         # Kiểm tra file CSV đã tồn tại để tránh ghi trùng header, đảm bảo thư mục lưu file tồn tại và log trạng thái khởi động node
-        self.header_written = os.path.exists(self.csv_path)
-        os.makedirs(os.path.dirname(self.csv_path) or ".", exist_ok=True)
-        self.get_logger().info("FusionNode started, writing to: " + self.csv_path)
+        # self.header_written = os.path.exists(self.csv_path)
+        # os.makedirs(os.path.dirname(self.csv_path) or ".", exist_ok=True)
+        # self.get_logger().info("FusionNode started, writing to: " + self.csv_path)
 
     # Hàm nhận dữ iệu LIDAR và cố gắng ghi dữ liệu fusion nếu có đủ thông tin
     def lidar_cb(self, msg: LaserScan):
@@ -116,7 +132,7 @@ class FusionNode(Node):
         self.get_logger().info(
             f"wrote frame: {len(lidar.ranges)} points, phi={phi:.1f}°, psi={psi_deg:.1f}°"
         )
-        # reset latest_lidar to avoid duplicate write for same scan unless lidar publishes new
+        # Xóa dữ liệu đã ghi để chờ dữ liệu mới
         self.latest_lidar = None
 
 
